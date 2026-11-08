@@ -34,13 +34,13 @@ function isValidReceiptUrl(url: string | null): boolean {
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const identity = await requireIdentity(request);
   if (identity instanceof Response) return identity;
 
   const body = await request.json();
-  const id = params.id;
+  const { id } = await params;
 
   if (body.receipt_url !== undefined && !isValidReceiptUrl(body.receipt_url)) {
     return Response.json({ error: "Invalid receipt URL scheme" }, { status: 400 });
@@ -107,12 +107,12 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const identity = await requireIdentity(request);
   if (identity instanceof Response) return identity;
 
-  const id = params.id;
+  const { id } = await params;
 
   const result = await sql(
     "delete from bills where owner = $1 and id = $2 returning id",

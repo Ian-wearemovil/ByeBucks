@@ -13,10 +13,11 @@
     "incremental": true,
     "module": "esnext",
     "esModuleInterop": true,
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
     "jsx": "preserve",
+    "noUncheckedIndexedAccess": false,
     "plugins": [
       {
         "name": "next"
@@ -30,6 +31,7 @@
     "**/*.tsx"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "cursor/identity.ts"
   ]
 }
