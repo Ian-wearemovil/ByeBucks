@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { sql } from "../../../src/lib/db";
+import { requireIdentity } from "../../../cursor/identity";
 
 export const dynamic = "force-dynamic";
 
@@ -21,10 +22,12 @@ interface Bill {
 }
 
 export async function GET(request: NextRequest) {
+  const identity = await requireIdentity(request);
+  if (identity instanceof Response) return identity;
+
   const { searchParams } = new URL(request.url);
   const month = searchParams.get("month");
   const year = searchParams.get("year");
-  const owner = "user"; // Will use real identity later
 
   if (!month || !year) {
     return Response.json({ error: "Month and year required" }, { status: 400 });
@@ -32,7 +35,7 @@ export async function GET(request: NextRequest) {
 
   const bills = await sql<Bill>(
     "select * from bills where owner = $1 and month = $2 and year = $3 order by due_date asc",
-    [owner, parseInt(month), parseInt(year)]
+    [identity.sub, parseInt(month), parseInt(year)]
   );
 
   return Response.json(bills, {
@@ -41,9 +44,11 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const identity = await requireIdentity(request);
+  if (identity instanceof Response) return identity;
+
   const body = await request.json();
   const { name, amount, due_date, month, year, is_recurring, notification_days } = body;
-  const owner = "user"; // Will use real identity later
 
   if (!name || !amount || !due_date || !month || !year) {
     return Response.json({ error: "Missing required fields" }, { status: 400 });
@@ -53,7 +58,7 @@ export async function POST(request: NextRequest) {
     `insert into bills (owner, name, amount, due_date, month, year, is_recurring, notification_days)
      values ($1, $2, $3, $4, $5, $6, $7, $8)
      returning *`,
-    [owner, name, amount, due_date, month, year, is_recurring || false, notification_days || 3]
+    [identity.sub, name, amount, due_date, month, year, is_recurring || false, notification_days || 3]
   );
 
   return Response.json(result[0], {

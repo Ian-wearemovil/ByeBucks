@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { sql } from "../../../../src/lib/db";
+import { requireIdentity } from "../../../../cursor/identity";
 
 export const dynamic = "force-dynamic";
 
@@ -20,13 +21,30 @@ interface Bill {
   updated_at: string;
 }
 
+function isValidReceiptUrl(url: string | null): boolean {
+  if (!url) return true;
+  try {
+    const parsed = new URL(url, "http://example.com");
+    const scheme = parsed.protocol.slice(0, -1);
+    return scheme === "http" || scheme === "https";
+  } catch {
+    return false;
+  }
+}
+
 export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const identity = await requireIdentity(request);
+  if (identity instanceof Response) return identity;
+
   const body = await request.json();
-  const owner = "user"; // Will use real identity later
   const id = params.id;
+
+  if (body.receipt_url !== undefined && !isValidReceiptUrl(body.receipt_url)) {
+    return Response.json({ error: "Invalid receipt URL scheme" }, { status: 400 });
+  }
 
   const updates: string[] = [];
   const values: unknown[] = [];
@@ -68,7 +86,7 @@ export async function PUT(
   updates.push(`updated_at = $${paramIndex++}`);
   values.push(new Date().toISOString());
 
-  values.push(owner);
+  values.push(identity.sub);
   values.push(id);
 
   const result = await sql<Bill>(
@@ -91,12 +109,14 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const owner = "user"; // Will use real identity later
+  const identity = await requireIdentity(request);
+  if (identity instanceof Response) return identity;
+
   const id = params.id;
 
   const result = await sql(
     "delete from bills where owner = $1 and id = $2 returning id",
-    [owner, id]
+    [identity.sub, id]
   );
 
   if (result.length === 0) {

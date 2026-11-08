@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { sql } from "../../../src/lib/db";
+import { requireIdentity } from "../../../cursor/identity";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +13,8 @@ interface Bill {
 }
 
 export async function GET(request: NextRequest) {
-  const owner = "user"; // Will use real identity later
+  const identity = await requireIdentity(request);
+  if (identity instanceof Response) return identity;
   
   const today = new Date();
   const checkUntil = new Date();
@@ -26,7 +28,7 @@ export async function GET(request: NextRequest) {
        and due_date >= $2
        and due_date <= $3
      order by due_date asc`,
-    [owner, today.toISOString().split("T")[0], checkUntil.toISOString().split("T")[0]]
+    [identity.sub, today.toISOString().split("T")[0], checkUntil.toISOString().split("T")[0]]
   );
 
   const notifications = bills
@@ -43,5 +45,7 @@ export async function GET(request: NextRequest) {
       dueDate: bill.due_date,
     }));
 
-  return Response.json(notifications);
+  return Response.json(notifications, {
+    headers: { "cache-control": "private, no-store" }
+  });
 }
